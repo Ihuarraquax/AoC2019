@@ -7,12 +7,12 @@ import java.util.Arrays;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 
-public class Day5 {
+public class IntcodeComputer {
 
+    private static final int MEMORY_SIZE = 1000000;
+    public int relativeBase;
     private int phase;
-    public int[] table;
-    private String data;
-    private final int VALUE = 19690720;
+    public long[] table;
     private Scanner scanner;
     private final String ADD = "01";
     private final String MUL = "02";
@@ -22,53 +22,54 @@ public class Day5 {
     private final String JIF = "06";
     private final String LT = "07";
     private final String EQU = "08";
+    private final String RB = "09";
     private final String HALT = "99";
-    private boolean secondParamState;
-    private boolean firstParamState;
-    private boolean thirdParamState;
-    private int c;
-    private int b;
-    private int a;
+    private char secondParamState;
+    private char firstParamState;
+    private char thirdParamState;
+    private long c;
+    private long b;
+    private long a;
     private boolean stopped;
     private boolean isPhaseSet = true;
     private int i;
 
-    public Day5(String code) {
+    public IntcodeComputer(String code) {
         initTable(code);
     }
 
-    public Day5() {
-    }
-
-    public Day5(String code, int phase) {
+    public IntcodeComputer(String code, int phase) {
         initTable(code);
         this.phase = phase;
+        isPhaseSet = false;
         i = 0;
     }
 
-    public void solve(String s) {
-        initTable(s);
-        processOpcodes();
+    public IntcodeComputer() {
+
     }
 
-    void solve() {
+    public void run(String code, int input) {
+        initTable(code);
+        computeCodeWithInputAndReturnOutput(input);
+    }
+
+    public void run(String code) {
+        initTable(code);
+        i = 0;
         scanner = new Scanner(System.in);
-        data = Utils.getInputData();
-        initTable(data);
         processOpcodes();
-        scanner.close();
     }
 
-    public Integer computeCode(int input) {
+    public Integer computeCodeWithInputAndReturnOutput(int input) {
         PrintStream old = System.out;
-        isPhaseSet = false;
         scanner = new Scanner(new ByteArrayInputStream(String.valueOf(input).getBytes()));
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         System.setOut(new PrintStream(outputStream));
         processOpcodes();
         System.setOut(old);
         String returnValue = outputStream.toString().trim();
-        if(returnValue.equals("")){
+        if (returnValue.equals("")) {
             return null;
         }
         return Integer.valueOf(returnValue);
@@ -92,95 +93,149 @@ public class Day5 {
 
     private void processOpcodes() {
         stopped = false;
-        while(i < table.length) {
+        while (i < table.length) {
 
             char[] command = getOpcodeFromNumber(i);
             String opcode = command[3] + "" + command[4];
-            firstParamState = false;
-            secondParamState = false;
-            thirdParamState = false;
-
+            firstParamState = '0';
+            secondParamState = '0';
+            thirdParamState = '0';
             if (opcode.equals(HALT) || stopped) {
                 break;
             }
 
-            evaluateParams(i, command, opcode);
+            evaluateParams(command);
             //debugInfo(i, command);
 
             switch (opcode) {
                 case ADD:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
-                    c = thirdParamState ? i + 3 : table[i + 3];
-                    table[c] = a + b;
+                    evaluateABC();
+                    table[(int)c] = a + b;
                     i += 4;
                     break;
                 case MUL:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
-                    c = thirdParamState ? i + 3 : table[i + 3];
-                    table[c] = a * b;
+                    evaluateABC();
+                    table[(int)c] = a * b;
                     i += 4;
                     break;
                 case INPUT:
-                    a = firstParamState ? i + 1 : table[i + 1];
+                    evaluateA();
                     if (!isPhaseSet) {
-                        table[a] = phase;
+                        table[(int)a] = phase;
                         isPhaseSet = true;
                     } else {
-                        table[a] = scanner.nextInt();
+                        if (scanner.hasNextLong()) {
+                            table[(int)a] = scanner.nextLong();
+                        } else {
+                            stopped = true;
+                            break;
+                        }
                     }
                     i += 2;
                     break;
                 case OUTPUT:
-                    a = firstParamState ? i + 1 : table[i + 1];
-                    System.out.println(table[a]);
+                    evaluateA();
+                    System.out.println(table[(int)a]);
                     i += 2;
-                    stopped = true;
                     break;
                 case JIT:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
+                    evaluateAB();
                     if (a != 0) {
-                        i = b;
+                        i = (int)b;
                     } else {
                         i += 3;
                     }
                     break;
                 case JIF:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
+                    evaluateAB();
                     if (a == 0) {
-                        i = b;
+                        i =(int) b;
                     } else {
                         i += 3;
                     }
                     break;
                 case LT:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
-                    c = thirdParamState ? i + 3 : table[i + 3];
+                    evaluateABC();
                     if (a < b) {
-                        table[c] = 1;
+                        table[(int)c] = 1;
                     } else {
-                        table[c] = 0;
+                        table[(int)c] = 0;
                     }
                     i += 4;
                     break;
                 case EQU:
-                    a = firstParamState ? table[i + 1] : table[table[i + 1]];
-                    b = secondParamState ? table[i + 2] : table[table[i + 2]];
-                    c = thirdParamState ? i + 3 : table[i + 3];
+                    evaluateABC();
                     if (a == b) {
-                        table[c] = 1;
+                        table[(int)c] = 1;
                     } else {
-                        table[c] = 0;
+                        table[(int)c] = 0;
                     }
                     i += 4;
+                    break;
+                case RB:
+                    if (firstParamState == '0') {
+                        a = table[(int)table[i + 1]];
+                    }
+                    if (firstParamState == '1') {
+                        a = table[i + 1];
+                    }
+                    if (firstParamState == '2') {
+                        a = table[relativeBase + (int)table[i + 1]];
+                    }
+                    relativeBase += a;
+                    i += 2;
                     break;
             }
         }
 
+    }
+
+    private void evaluateAB() {
+        if (firstParamState == '0') {
+            a = table[(int)table[i + 1]];
+        }
+        if (firstParamState == '1') {
+            a = table[i + 1];
+        }
+        if (firstParamState == '2') {
+            a = table[relativeBase + (int)table[i + 1]];
+        }
+
+        if (secondParamState == '0') {
+            b = table[(int)table[i + 2]];
+        }
+        if (secondParamState == '1') {
+            b = table[i + 2];
+        }
+        if (secondParamState == '2') {
+            b = table[relativeBase + (int)table[i + 2]];
+        }
+    }
+
+    private void evaluateA() {
+        if (firstParamState == '0') {
+            a = table[i + 1];
+        }
+        if (firstParamState == '1') {
+            a = i + 1;
+        }
+        if (firstParamState == '2') {
+            a = relativeBase + table[i + 1];
+        }
+    }
+
+    private void evaluateABC() {
+        evaluateAB();
+
+        if (thirdParamState == '0') {
+            c = table[i + 3];
+        }
+        if (thirdParamState == '1') {
+            c = i + 3;
+        }
+        if (thirdParamState == '2') {
+            c = relativeBase + table[i + 3];
+        }
     }
 
     private void debugInfo(int i, char[] command) {
@@ -191,16 +246,10 @@ public class Day5 {
 //        System.out.println();
     }
 
-    private void evaluateParams(int i, char[] command, String opcode) {
-        if (command[2] == '1') {
-            firstParamState = true;
-        }
-        if (command[1] == '1') {
-            secondParamState = true;
-        }
-        if (command[0] == '1') {
-            thirdParamState = true;
-        }
+    private void evaluateParams(char[] command) {
+        firstParamState = command[2];
+        secondParamState = command[1];
+        thirdParamState = command[0];
     }
 
 
@@ -216,10 +265,12 @@ public class Day5 {
 
     }
 
-    private int[] makeTableFromTokenizer(StringTokenizer tokenizer) {
-        int[] table = new int[tokenizer.countTokens()];
-        for (int i = 0; i < table.length; i++) {
-            table[i] = Integer.parseInt(tokenizer.nextToken());
+    private long[] makeTableFromTokenizer(StringTokenizer tokenizer) {
+        long[] table = new long[MEMORY_SIZE];
+        int lastIndex = tokenizer.countTokens();
+        Arrays.fill(table, 0);
+        for (int i = 0; i < lastIndex; i++) {
+            table[i] = Long.parseLong(tokenizer.nextToken());
         }
         return table;
     }
